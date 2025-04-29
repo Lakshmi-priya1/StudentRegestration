@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    environment {
+        GIT_HOME = 'C:/Program Files/Git'
+    }
+
     tools {
         git 'git' // This specifies the Git installation you added in the Global Tool Configuration
     }
