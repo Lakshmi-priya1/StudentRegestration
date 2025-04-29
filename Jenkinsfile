@@ -1,82 +1,51 @@
 pipeline {
     agent any
 
-    environment {
-        DOCKER_IMAGE = 'student-registration-app'
-        DOCKER_TAG = 'latest'
-        DOCKER_REGISTRY = 'docker.io'  // Change to your Docker registry if necessary
-        REGISTRY_CREDENTIALS = 'docker-hub-credentials' // Jenkins credentials for Docker registry (if applicable)
+    tools {
+        git 'git' // This specifies the Git installation you added in the Global Tool Configuration
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Checkout the code from your Git repository
                 git 'https://github.com/Lakshmi-priya1/StudentRegestration.git'
             }
         }
 
-        stage('Build') {
+        stage('Build Jar') {
             steps {
-                script {
-                    // Build the application using Maven
-                    // Change to './gradlew build' if you're using Gradle
-                    sh './mvnw clean package -DskipTests'
-                }
+                sh './mvnw clean package -DskipTests'
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Start with Docker Compose') {
             steps {
-                script {
-                    // Build the Docker image using the Dockerfile
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                }
+                sh 'docker-compose down' // Clean any previous containers
+                sh 'docker-compose up -d --build'
             }
         }
 
-        stage('Test Docker Image') {
+        stage('Wait and Test') {
             steps {
-                script {
-                    // Optionally, test the Docker image by running it
-                    sh "docker run -d -p 8089:8089 ${DOCKER_IMAGE}:${DOCKER_TAG}"
-
-                    // Add additional tests to verify the container is running (e.g., health checks, etc.)
-
-                    // Stop and remove the container after testing
-                    sh "docker ps -q --filter 'ancestor=${DOCKER_IMAGE}:${DOCKER_TAG}' | xargs docker stop"
-                    sh "docker ps -a -q --filter 'ancestor=${DOCKER_IMAGE}:${DOCKER_TAG}' | xargs docker rm"
-                }
+                echo 'Waiting for services to be ready...'
+                sh 'sleep 20'
+                sh 'curl -f http://localhost:8089 || echo "App not responding!"'
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Stop Containers') {
             steps {
-                script {
-                    // If you're using Docker Hub, login with credentials
-                    // If you're pushing to a different registry, modify this accordingly
-                    docker.withRegistry('https://${DOCKER_REGISTRY}', REGISTRY_CREDENTIALS) {
-                        // Push the Docker image to the registry
-                        sh "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                    }
-                }
-            }
-        }
-
-        stage('Cleanup') {
-            steps {
-                script {
-                    // Optionally, clean up the local Docker image
-                    sh "docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                }
+                sh 'docker-compose down'
             }
         }
     }
 
     post {
         always {
-            // Clean up the workspace after the build
+            echo 'Cleaning workspace...'
             cleanWs()
         }
     }
 }
+
+
